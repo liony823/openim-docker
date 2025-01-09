@@ -397,3 +397,6 @@ Sessionx.vim
 .idea
 dist/
 config/config.yaml
+
+# mongodb
+mongodb.key
