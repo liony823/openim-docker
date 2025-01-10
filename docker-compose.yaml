@@ -6,14 +6,22 @@ services:
   mongo:
     image: "${MONGO_IMAGE}"
     container_name: mongo
+    ports:
+      - "37017:27017"
     command: >
       bash -c '
+      chmod 400 /data/configdb/mongodb.key &&
+      chown 999:999 /data/configdb/mongodb.key &&
       docker-entrypoint.sh mongod --wiredTigerCacheSizeGB $$wiredTigerCacheSizeGB --auth --replSet rs0 --keyFile /data/configdb/mongodb.key &
       until mongosh -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval "db.runCommand({ ping: 1 })" &>/dev/null; do
         echo "Waiting for MongoDB to start..."
         sleep 1
       done &&
       mongosh -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval "
+      rs.initiate({
+        _id: \"rs0\",
+        members: [{ _id: 0, host: \"localhost:27017\" }]
+      });
       db = db.getSiblingDB(\"$$MONGO_INITDB_DATABASE\");
       if (!db.getUser(\"$$MONGO_OPENIM_USERNAME\")) {
         db.createUser({
@@ -51,6 +59,8 @@ services:
   redis:
     image: "${REDIS_IMAGE}"
     container_name: redis
+    ports:
+      - "16379:6379"
     volumes:
       - "${DATA_DIR}/components/redis/data:/data"
       - "${DATA_DIR}/components/redis/config/redis.conf:/usr/local/redis/config/redis.conf"
