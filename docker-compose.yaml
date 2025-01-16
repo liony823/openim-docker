@@ -6,14 +6,22 @@ services:
   mongo:
     image: "${MONGO_IMAGE}"
     container_name: mongo
+    ports:
+      - "37017:27017"
     command: >
       bash -c '
-      docker-entrypoint.sh mongod --wiredTigerCacheSizeGB $$wiredTigerCacheSizeGB --auth &
+      chmod 400 /data/configdb/mongodb.key &&
+      chown 999:999 /data/configdb/mongodb.key &&
+      docker-entrypoint.sh mongod --wiredTigerCacheSizeGB $$wiredTigerCacheSizeGB --auth --replSet rs0 --keyFile /data/configdb/mongodb.key &
       until mongosh -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval "db.runCommand({ ping: 1 })" &>/dev/null; do
         echo "Waiting for MongoDB to start..."
         sleep 1
       done &&
       mongosh -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval "
+      rs.initiate({
+        _id: \"rs0\",
+        members: [{ _id: 0, host: \"localhost:27017\" }]
+      });
       db = db.getSiblingDB(\"$$MONGO_INITDB_DATABASE\");
       if (!db.getUser(\"$$MONGO_OPENIM_USERNAME\")) {
         db.createUser({
@@ -32,6 +40,7 @@ services:
       tail -f /dev/null
       '
     volumes:
+      - "${DATA_DIR}/mongodb.key:/data/configdb/mongodb.key"
       - "${DATA_DIR}/components/mongodb/data/db:/data/db"
       - "${DATA_DIR}/components/mongodb/data/logs:/data/logs"
       - "${DATA_DIR}/components/mongodb/data/conf:/etc/mongo"
@@ -39,8 +48,8 @@ services:
       - TZ=Asia/Shanghai
       - wiredTigerCacheSizeGB=1
       - MONGO_INITDB_ROOT_USERNAME=root
-      - MONGO_INITDB_ROOT_PASSWORD=openIM123
-      - MONGO_INITDB_DATABASE=openim_v3
+      - MONGO_INITDB_ROOT_PASSWORD=rootqwe123
+      - MONGO_INITDB_DATABASE=${MONGO_DATABASE}
       - MONGO_OPENIM_USERNAME=${MONGO_USERNAME}
       - MONGO_OPENIM_PASSWORD=${MONGO_PASSWORD}
     restart: always
@@ -50,6 +59,8 @@ services:
   redis:
     image: "${REDIS_IMAGE}"
     container_name: redis
+    ports:
+      - "16379:6379"
     volumes:
       - "${DATA_DIR}/components/redis/data:/data"
       - "${DATA_DIR}/components/redis/config/redis.conf:/usr/local/redis/config/redis.conf"
@@ -218,9 +229,8 @@ services:
       timeout: 60s
       retries: 10
     environment:
-      - IMENV_MONGODB_ADDRESS=${MONGO_ADDRESS}
-      - IMENV_MONGODB_USERNAME=${MONGO_USERNAME}
-      - IMENV_MONGODB_PASSWORD=${MONGO_PASSWORD}
+      - IMENV_MONGODB_URI=${MONGO_URI}
+      - IMENV_MONGODB_DATABASE=${MONGO_DATABASE}
       - IMENV_KAFKA_ADDRESS=${KAFKA_ADDRESS}
       - IMENV_DISCOVERY_ETCD_ADDRESS=${ETCD_ADDRESS}
       - IMENV_REDIS_ADDRESS=${REDIS_ADDRESS}
@@ -232,6 +242,8 @@ services:
       - IMENV_SHARE_SECRET=${OPENIM_SECRET}
       - IMENV_LOG_ISSTDOUT=${LOG_IS_STDOUT}
       - IMENV_LOG_REMAINLOGLEVEL=${LOG_LEVEL}
+      - IMENV_LOG_ROTATIONTIME=${LOG_ROTATION_TIME}
+      - IMENV_LOG_REMAINROTATIONCOUNT=${LOG_REMAIN_ROTATION_COUNT}
       - IMENV_OPENIM_API_PROMETHEUS_GRAFANAURL=${GRAFANA_URL}
     restart: always
     depends_on:
@@ -253,9 +265,8 @@ services:
       timeout: 60s
       retries: 10
     environment:
-      - CHATENV_MONGODB_ADDRESS=${MONGO_ADDRESS}
-      - CHATENV_MONGODB_USERNAME=${MONGO_USERNAME}
-      - CHATENV_MONGODB_PASSWORD=${MONGO_PASSWORD}
+      - CHATENV_MONGODB_URI=${MONGO_URI}
+      - CHATENV_MONGODB_DATABASE=${MONGO_DATABASE}
       - CHATENV_DISCOVERY_ETCD_ADDRESS=${ETCD_ADDRESS}
       - CHATENV_REDIS_ADDRESS=${REDIS_ADDRESS}
       - CHATENV_REDIS_PASSWORD=${REDIS_PASSWORD}
@@ -263,6 +274,8 @@ services:
       - CHATENV_SHARE_OPENIM_APIURL=${API_URL}
       - CHATENV_LOG_ISSTDOUT=${LOG_IS_STDOUT}
       - CHATENV_LOG_REMAINLOGLEVEL=${LOG_LEVEL}
+      - CHATENV_LOG_ROTATIONTIME=${LOG_ROTATION_TIME}
+      - CHATENV_LOG_REMAINROTATIONCOUNT=${LOG_REMAIN_ROTATION_COUNT}
     ports:
       - "${CHAT_API_PORT}:10008"
       - "${ADMIN_API_PORT}:10009"
