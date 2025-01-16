@@ -220,7 +220,7 @@ services:
     networks:
       - openim
 
-  openim-server:
+  stealthx-server:
     image: ${OPENIM_SERVER_IMAGE}
     container_name: stealthx-server
     init: true
@@ -262,7 +262,7 @@ services:
     networks:
       - openim
 
-  openim-chat:
+  stealthx-chat:
     image: ${OPENIM_CHAT_IMAGE}
     container_name: stealthx-chat
     init: true
