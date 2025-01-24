@@ -10,18 +10,13 @@ services:
       - "37017:27017"
     command: >
       bash -c '
-      chmod 400 /data/configdb/mongodb.key &&
-      chown 999:999 /data/configdb/mongodb.key &&
       docker-entrypoint.sh mongod --wiredTigerCacheSizeGB $$wiredTigerCacheSizeGB --auth --replSet rs0 --keyFile /data/configdb/mongodb.key &
       until mongosh -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval "db.runCommand({ ping: 1 })" &>/dev/null; do
         echo "Waiting for MongoDB to start..."
         sleep 1
       done &&
       mongosh -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval "
-      rs.initiate({
-        _id: \"rs0\",
-        members: [{ _id: 0, host: \"localhost:27017\" }]
-      });
+
       db = db.getSiblingDB(\"$$MONGO_INITDB_DATABASE\");
       if (!db.getUser(\"$$MONGO_OPENIM_USERNAME\")) {
         db.createUser({
@@ -48,10 +43,11 @@ services:
       - TZ=Asia/Shanghai
       - wiredTigerCacheSizeGB=1
       - MONGO_INITDB_ROOT_USERNAME=root
-      - MONGO_INITDB_ROOT_PASSWORD=rootqwe123
+      - MONGO_INITDB_ROOT_PASSWORD=owlIM123
       - MONGO_INITDB_DATABASE=${MONGO_DATABASE}
       - MONGO_OPENIM_USERNAME=${MONGO_USERNAME}
       - MONGO_OPENIM_PASSWORD=${MONGO_PASSWORD}
+      - VERSION=1
     restart: always
     networks:
       - openim
@@ -132,23 +128,23 @@ services:
     networks:
       - openim
 
-  openim-web-front:
-    image: ${OPENIM_WEB_FRONT_IMAGE}
-    container_name: openim-web-front
-    restart: always
-    ports:
-      - "${OPENIM_WEB_FRONT_PORT}:80"
-    networks:
-      - openim
+  # openim-web-front:
+  #   image: ${OPENIM_WEB_FRONT_IMAGE}
+  #   container_name: openim-web-front
+  #   restart: always
+  #   ports:
+  #     - "${OPENIM_WEB_FRONT_PORT}:80"
+  #   networks:
+  #     - openim
 
-  openim-admin-front:
-    image: ${OPENIM_ADMIN_FRONT_IMAGE}
-    container_name: openim-admin-front
-    restart: always
-    ports:
-      - "${OPENIM_ADMIN_FRONT_PORT}:80"
-    networks:
-      - openim
+  # openim-admin-front:
+  #   image: ${OPENIM_ADMIN_FRONT_IMAGE}
+  #   container_name: openim-admin-front
+  #   restart: always
+  #   ports:
+  #     - "${OPENIM_ADMIN_FRONT_PORT}:80"
+  #   networks:
+  #     - openim
 
   prometheus:
     image: ${PROMETHEUS_IMAGE}
@@ -210,9 +206,23 @@ services:
     networks:
       - openim
 
-  openim-server:
+  livekit-server:
+    image: livekit/livekit-server
+    container_name: livekit-server
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    volumes:
+      - ./livekit/livekit.yaml:/livekit.yaml
+    command: --config /livekit.yaml --bind 0.0.0.0
+    restart: always
+    networks:
+      - openim
+
+  stealthx-server:
     image: ${OPENIM_SERVER_IMAGE}
-    container_name: openim-server
+    container_name: stealthx-server
     init: true
     ports:
       - "${OPENIM_MSG_GATEWAY_PORT}:10001"
@@ -239,6 +249,9 @@ services:
       - IMENV_LOG_ROTATIONTIME=${LOG_ROTATION_TIME}
       - IMENV_LOG_REMAINROTATIONCOUNT=${LOG_REMAIN_ROTATION_COUNT}
       - IMENV_OPENIM_API_PROMETHEUS_GRAFANAURL=${GRAFANA_URL}
+      - IMENV_WEBHOOKS_URL=${WEBHOOK_URL}
+      - IMENV_LOG_ISJSON=${LOG_ISJSON}
+      - IMENV_LOG_ISSIMPLIFY=${LOG_ISSIMPLIFY}
     restart: always
     depends_on:
       - mongo
@@ -249,9 +262,9 @@ services:
     networks:
       - openim
 
-  openim-chat:
+  stealthx-chat:
     image: ${OPENIM_CHAT_IMAGE}
-    container_name: openim-chat
+    container_name: stealthx-chat
     init: true
     healthcheck:
       test: [ "CMD", "sh", "-c", "mage check" ]
@@ -266,10 +279,16 @@ services:
       - CHATENV_REDIS_PASSWORD=${REDIS_PASSWORD}
       - CHATENV_SHARE_OPENIM_SECRET=${OPENIM_SECRET}
       - CHATENV_SHARE_OPENIM_APIURL=${API_URL}
+      - CHATENV_SHARE_LIVEKIT_URL=${LIVEKIT_URL}
+      - CHATENV_SHARE_LIVEKIT_KEY=${LIVEKIT_KEY}
+      - CHATENV_SHARE_LIVEKIT_SECRET=${LIVEKIT_SECRET}
+      - CHATENV_SHARE_REDPACKET_APIURL=${REDPACKET_APIURL}
       - CHATENV_LOG_ISSTDOUT=${LOG_IS_STDOUT}
       - CHATENV_LOG_REMAINLOGLEVEL=${LOG_LEVEL}
       - CHATENV_LOG_ROTATIONTIME=${LOG_ROTATION_TIME}
       - CHATENV_LOG_REMAINROTATIONCOUNT=${LOG_REMAIN_ROTATION_COUNT}
+      - CHATENV_LOG_ISJSON=${LOG_ISJSON}
+      - CHATENV_LOG_ISSIMPLIFY=${LOG_ISSIMPLIFY}
     ports:
       - "${CHAT_API_PORT}:10008"
       - "${ADMIN_API_PORT}:10009"
@@ -280,6 +299,6 @@ services:
       - etcd
       - kafka
       - minio
-      - openim-server
+      - stealthx-server
     networks:
       - openim
