@@ -7,5 +7,6 @@ rtc:
     enable_loopback_candidate: false
 redis:
   address: redis:6379
+  password: stealthX123
 keys:
-    APIftrp1: m2XJsMAkVFM49pYcsQ6srAmyx1Qog5KPmQwm1CPPlfk=
+    APIftrp1: 8OsVWyDvvig+rioj1LYPMg==
