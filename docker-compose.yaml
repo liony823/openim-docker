@@ -298,6 +298,6 @@ services:
       - etcd
       - kafka
       - minio
-      - stealthx-server
+      - owl-server
     networks:
       - openim
